@@ -11,6 +11,7 @@ require 'ping'
 @repo          = "http://mirror.sac1.zdsys.com/ubuntu/"
 @debug         = true
 @postout       = ""
+@org           = "linbsd"
 
 @args_def =
   {
@@ -26,7 +27,7 @@ require 'ping'
   :name       => "New VM Name (e.g. app66)",
   :partsize   => "The size of the root partition in GB", 
   :pod        => "Name of the pod",
-  :template   => "Name of the template. Run 'rake tmplist filter=linbsd' to see the custom templates",
+  :template   => "Name of the template. Run 'rake tmplist filter=#{@org}' to see the custom templates",
   :xenhost    => "XenServer hostname or ipaddress"
 }
 
@@ -272,7 +273,7 @@ def filter_results_inverse output, filter
 end
 
 def list_vms filter=nil
-  filter_results exec_on_dom0("xe vm-list  is-control-domain=false"), filter
+  filter_results exec_on_dom0("xe vm-list is-control-domain=false"), filter
 end
 
 def perror msg 
@@ -407,8 +408,13 @@ def destroy_vm name, pod
   @postout << "VMs were removed and we have deleted their dna. Please commit pods/"
 end
 
-def list_templates filter="linbsd"
+def list_templates filter=@org
   filter_results exec_on_dom0("xe template-list"), filter
+end
+
+def list_snapshots filter=nil
+  filter_results exec_on_dom0("xe snapshot-list"), filter
+  #puts (filter_results exec_on_dom0("xe snapshot-list"), ENV['name']).grep(/name-label/)
 end
 
 def template_exist? template
@@ -620,15 +626,23 @@ end
 desc "Snapshot a VM"
 task :vmsnapshot do
   ensure_args [ :name ]
-  exec_on_dom0 "xe vm-snapshot uuid=#{get_uuid_by_vmname(ENV['name'])} new-name-label=#{ENV['name']}.#{Time.now.to_i}"
+  check_vm_exists ENV['name'] 
+  puts exec_on_dom0 "xe vm-snapshot uuid=#{get_uuid_by_vmname(ENV['name'])} new-name-label=#{ENV['name']}.#{Time.now.to_i}"
+end
+
+desc "Revert to snapshot of VM"
+task :vmrevert do
+  ensure_args [ :name ]
+  check_vm_exists ENV['name'] 
+  puts exec_on_dom0 "xe snapshot-revert uuid=#{get_uuid_by_vmname(ENV['name'])} new-name-label=#{ENV['name']}.#{Time.now.to_i}"
 end
 
 desc "List Snapshot for a given VM"
 task :listsnaps do
   ensure_args [ :name ]
-  exec_on_dom0 "xe snapshot-list uuid=#{get_uuid_by_vmname(ENV['name'])}"
+  check_vm_exists ENV['name'] 
+  puts (filter_results exec_on_dom0("xe snapshot-list"), ENV['name']).grep(/name-label/)
 end
-
 
 desc "Remove a template"
 task :tmpdelete do
